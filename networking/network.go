@@ -14,6 +14,6 @@ func SetUpNetwork() {
 	fmt.Println("Bridge Name:", bridgeName)
 	fmt.Println("Tap Name:", tapName)
 
-	database.SaveBridgeDetails(bridgeName, tapName, userID, ipAddress)
+	database.SaveNetworkDetails(bridgeName, tapName, userID, ipAddress)
 
 }

@@ -43,7 +43,7 @@ func InitMongoDB() {
 	log.Println("Connected to MongoDB!")
 }
 
-func SaveBridgeDetails(bridgeName string, tapName string, userID string, ipAddress string) error {
+func SaveNetworkDetails(bridgeName string, tapName string, userID string, ipAddress string) error {
 	if mongoClient == nil {
 		log.Fatal("MongoDB client not initialized.")
 		return nil
@@ -53,6 +53,8 @@ func SaveBridgeDetails(bridgeName string, tapName string, userID string, ipAddre
 	document := bson.D{
 		{Key: "userID", Value: userID},
 		{Key: "bridgeName", Value: bridgeName},
+		// {Key: "tapID", Value: tapId},
+
 		{Key: "tapName", Value: tapName},
 		{Key: "ipAddress", Value: ipAddress},
 		{Key: "created_at", Value: time.Now()},
