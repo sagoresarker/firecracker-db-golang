@@ -43,7 +43,7 @@ func InitMongoDB() {
 	log.Println("Connected to MongoDB!")
 }
 
-func SaveBridgeDetails(bridgeName string, userID string, ipAddress string) error {
+func SaveBridgeDetails(bridgeName string, tapName string, userID string, ipAddress string) error {
 	if mongoClient == nil {
 		log.Fatal("MongoDB client not initialized.")
 		return nil
@@ -51,19 +51,20 @@ func SaveBridgeDetails(bridgeName string, userID string, ipAddress string) error
 
 	collection := mongoClient.Database("firecrackerdb").Collection("bridge-info")
 	document := bson.D{
-		{Key: "bridgeName", Value: bridgeName},
 		{Key: "userID", Value: userID},
+		{Key: "bridgeName", Value: bridgeName},
+		{Key: "tapName", Value: tapName},
 		{Key: "ipAddress", Value: ipAddress},
 		{Key: "created_at", Value: time.Now()},
 	}
 
 	_, err := collection.InsertOne(context.Background(), document)
 	if err != nil {
-		log.Println("Error saving bridge details to MongoDB:", err)
+		log.Println("Error saving network details to MongoDB:", err)
 		return err
 	}
 
-	log.Println("Bridge details saved to MongoDB.")
+	log.Println("Network details saved to MongoDB.")
 
 	return nil
 }
