@@ -3,21 +3,22 @@ package main
 import (
 	"fmt"
 
-	"github.com/sagoresarker/firecracker-db-golang/database"
-	"github.com/sagoresarker/firecracker-db-golang/networking"
+	vm "github.com/sagoresarker/firecracker-db-golang/firecracker"
 )
 
 func main() {
 	fmt.Println("Hello World")
-	database.InitMongoDB()
+	// database.InitMongoDB()
 
-	networking.SetUpNetwork()
+	// networking.SetUpNetwork()
 
-	bridgeDetails, err := database.GetBridgeDetails()
-	if err != nil {
-		fmt.Println("Error getting bridge details:", err)
-		return
-	}
+	// bridgeDetails, err := database.GetBridgeDetails()
+	// if err != nil {
+	// 	fmt.Println("Error getting bridge details:", err)
+	// 	return
+	// }
 
-	fmt.Println("Bridge Details:", bridgeDetails)
+	// fmt.Println("Bridge Details:", bridgeDetails)
+
+	vm.Vmlaunch()
 }
