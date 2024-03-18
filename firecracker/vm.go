@@ -2,6 +2,7 @@ package vm
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -9,16 +10,18 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
+	"syscall"
 	"time"
 )
 
 const (
-	apiSocket      = "/tmp/firecracker1.socket"
+	apiSocket      = "/tmp/firecracker.socket"
 	logFile        = "./firecracker1.log"
-	kernel         = "files/vmlinux-5.10.209"
+	kernel         = "vmlinux-5.10.209"
 	kernelBootArgs = "console=ttyS0 reboot=k panic=1 pci=off"
-	rootFS         = "files/rootfs.ext4"
+	rootFS         = "rootfs.ext4"
 	fcMAC          = "06:00:AC:10:00:02"
 	tapIP          = "172.16.0.2"
 )
@@ -57,8 +60,68 @@ type action struct {
 	ActionType string `json:"action_type"`
 }
 
+type instanceInfo struct {
+	State string `json:"state"`
+}
+
+func waitForSignal(cmd *exec.Cmd) {
+	signalChan := make(chan os.Signal, 1)
+	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
+
+	// Block until a signal is received
+	sig := <-signalChan
+
+	fmt.Printf("\nReceived signal: %s\n", sig)
+
+	// Terminate the Firecracker process gracefully
+	if err := cmd.Process.Signal(syscall.SIGTERM); err != nil {
+		fmt.Printf("Failed to terminate Firecracker process: %v\n", err)
+	}
+
+	// Wait for the Firecracker process to exit
+	if _, err := cmd.Process.Wait(); err != nil {
+		fmt.Printf("Firecracker process exited with error: %v\n", err)
+	}
+}
+
+func checkInstanceState() error {
+	unixTransport := &http.Transport{
+		DialContext: func(_ context.Context, _, _ string) (net.Conn, error) {
+			return net.Dial("unix", apiSocket)
+		},
+	}
+
+	client := &http.Client{
+		Transport: unixTransport,
+	}
+
+	resp, err := client.Get("http://unix/machine-config")
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := ioutil.ReadAll(resp.Body)
+		return fmt.Errorf("HTTP request failed with status code %d: %s", resp.StatusCode, body)
+	}
+
+	var info instanceInfo
+	err = json.NewDecoder(resp.Body).Decode(&info)
+	if err != nil {
+		return err
+	}
+
+	if info.State != "Running" {
+		return fmt.Errorf("microVM instance is not running (state: %s)", info.State)
+	}
+
+	fmt.Println("microVM instance is running")
+	return nil
+}
+
 func createSocket() error {
-	apiSocket := "/tmp/firecracker1.socket"
+	apiSocket := "/tmp/firecracker.socket"
 
 	// Remove existing socket file
 	err := os.RemoveAll(apiSocket)
@@ -67,19 +130,37 @@ func createSocket() error {
 	}
 
 	// Run the firecracker command
-	cmd := exec.Command("sudo", "./firecracker", "--api-sock", apiSocket)
+	cmd := exec.Command("sudo", "firecracker/firecracker", "--api-sock", apiSocket)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
 	err = cmd.Start()
 	if err != nil {
 		return err
 	}
 
-	// Wait for the firecracker process to start
-	time.Sleep(1 * time.Second)
+	// Wait for the socket file to be created
+	for {
+		_, err = os.Stat(apiSocket)
+		if err == nil {
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	// Start a goroutine to handle signals
+	go waitForSignal(cmd)
 
 	return nil
 }
 
 func Vmlaunch() {
+
+	err := createSocket()
+	if err != nil {
+		fmt.Println("Error creating socket and starting firecracker:", err)
+		return
+	}
+
 	// Create log file
 	file, err := os.Create(logFile)
 	if err != nil {
@@ -89,7 +170,7 @@ func Vmlaunch() {
 	file.Close()
 
 	// Set log file
-	err = sendRequest("PUT", "http://localhost/logger", &logger{
+	err = sendRequest("PUT", "http://unix/logger", &logger{
 		LogPath:       logFile,
 		Level:         "Debug",
 		ShowLevel:     true,
@@ -101,7 +182,7 @@ func Vmlaunch() {
 	}
 
 	// Machine config
-	err = sendRequest("PUT", "http://localhost/machine-config", &machineConfig{
+	err = sendRequest("PUT", "http://unix/machine-config", &machineConfig{
 		MemSizeMiB: 2048,
 		VCPUCount:  1,
 	})
@@ -111,7 +192,7 @@ func Vmlaunch() {
 	}
 
 	// Set boot source
-	err = sendRequest("PUT", "http://localhost/boot-source", &bootSource{
+	err = sendRequest("PUT", "http://unix/boot-source", &bootSource{
 		KernelImagePath: kernel,
 		BootArgs:        kernelBootArgs,
 	})
@@ -121,7 +202,7 @@ func Vmlaunch() {
 	}
 
 	// Set rootfs
-	err = sendRequest("PUT", "http://localhost/drives/rootfs", &drive{
+	err = sendRequest("PUT", "http://unix/drives/rootfs", &drive{
 		DriveID:      "rootfs",
 		PathOnHost:   rootFS,
 		IsRootDevice: true,
@@ -134,7 +215,7 @@ func Vmlaunch() {
 
 	// Set network interface
 	tapDev := os.Getenv("TAP_DEV")
-	err = sendRequest("PUT", "http://localhost/network-interfaces/eth0", &networkInterface{
+	err = sendRequest("PUT", "http://unix/network-interfaces/eth0", &networkInterface{
 		IfaceID:     "eth0",
 		GuestMAC:    fcMAC,
 		HostDevName: tapDev,
@@ -148,7 +229,7 @@ func Vmlaunch() {
 	time.Sleep(15 * time.Millisecond)
 
 	// Start microVM
-	err = sendRequest("PUT", "http://localhost/actions", &action{
+	err = sendRequest("PUT", "http://unix/actions", &action{
 		ActionType: "InstanceStart",
 	})
 	if err != nil {
@@ -159,6 +240,12 @@ func Vmlaunch() {
 	// Sleep to allow microVM to start
 	time.Sleep(15 * time.Millisecond)
 
+	// Check if the instance is running
+	err = checkInstanceState()
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 	// SSH into the microVM
 	keyPath, _ := filepath.Abs("./key_pairs/id_rsa")
 	fmt.Println("To ssh into the microVM run: ssh -i", keyPath, "root@"+tapIP)
@@ -171,22 +258,33 @@ func sendRequest(method, url string, payload interface{}) error {
 		return err
 	}
 
-	conn, err := net.Dial("unix", apiSocket)
-	if err != nil {
-		return err
+	// Create a Unix domain socket transport
+	unixTransport := &http.Transport{
+		DialContext: func(_ context.Context, _, _ string) (net.Conn, error) {
+			return net.Dial("unix", apiSocket)
+		},
 	}
-	defer conn.Close()
+
+	// Create a custom HTTP client using the Unix domain socket transport
+	client := &http.Client{
+		Transport: unixTransport,
+	}
 
 	req, err := http.NewRequest(method, url, bytes.NewBuffer(data))
 	if err != nil {
 		return err
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNoContent {
+		// Treat 204 No Content as a success
+		return nil
+	}
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := ioutil.ReadAll(resp.Body)

@@ -1,13 +1,11 @@
 package main
 
 import (
-	"fmt"
-
 	vm "github.com/sagoresarker/firecracker-db-golang/firecracker"
 )
 
 func main() {
-	fmt.Println("Hello World")
+	//fmt.Println("Hello World")
 	// database.InitMongoDB()
 
 	// networking.SetUpNetwork()
