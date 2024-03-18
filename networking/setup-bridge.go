@@ -6,8 +6,6 @@ import (
 	"net"
 	"os/exec"
 	"time"
-
-	"github.com/sagoresarker/firecracker-db-golang/database"
 )
 
 const charset = "abcdefghijklmnopqrstuvwxyz" +
@@ -87,10 +85,20 @@ func createBridge(bridgeName string, ipAddress string) error {
 
 	fmt.Printf("Bridge %s created and assigned IP Address %s\n", bridgeName, ipAddress)
 
+	cmd = exec.Command("sudo", "ip", "link", "set", "dev", bridgeName, "up")
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to up the bridge: %v", err)
+	}
+
+	cmd = exec.Command("sudo", "iptables", "-t", "nat", "-A", "POSTROUTING", "-o", bridgeName, "-j", "MASQUERADE")
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to setup the NAT Rule to the bridge: %v", err)
+	}
+
 	return nil
 }
 
-func SetupBridgeNetwork() {
+func SetupBridgeNetwork() (bridge string, userID string, ipAddress string) {
 	fmt.Println("Setting up bridge")
 
 	bridgeName, userID, ipAddress := generateValue()
@@ -103,5 +111,6 @@ func SetupBridgeNetwork() {
 		fmt.Println("Error creating bridge:", err)
 		return
 	}
-	database.SaveBridgeDetails(bridgeName, userID, ipAddress)
+
+	return bridgeName, userID, ipAddress
 }

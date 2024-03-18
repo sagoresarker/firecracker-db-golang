@@ -11,7 +11,7 @@ func main() {
 	fmt.Println("Hello World")
 	database.InitMongoDB()
 
-	networking.SetupBridgeNetwork()
+	networking.SetUpNetwork()
 
 	bridgeDetails, err := database.GetBridgeDetails()
 	if err != nil {
