@@ -1,6 +1,6 @@
 module github.com/sagoresarker/firecracker-db-golang
 
-go 1.21.8
+go 1.21
 
 require (
 	github.com/firecracker-microvm/firecracker-go-sdk v1.0.0

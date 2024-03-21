@@ -1,1 +1,10 @@
 files
+rootfs.ext4
+vmlinux-5.10.209
+
+firecracker/firecracker
+firecracker/firecracker-v1.7.0-x86_64
+firecracker_src
+
+release-v1.7.0-x86_64
+bash-script

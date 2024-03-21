@@ -1,0 +1,26 @@
+2024-03-18T21:25:41.234527973 [anonymous-instance:fc_api:INFO:src/firecracker/src/api_server/parsed_request.rs:162] The request was executed successfully. Status code: 204 No Content.
+2024-03-18T21:25:41.234573268 [anonymous-instance:fc_api:DEBUG:src/firecracker/src/api_server/mod.rs:115] Total previous API call duration: 240 us.
+2024-03-18T21:25:41.234945434 [anonymous-instance:fc_api:INFO:src/firecracker/src/api_server/parsed_request.rs:69] The API server received a Put request on "/machine-config" with body "{\"mem_size_mib\":2048,\"vcpu_count\":1}".
+2024-03-18T21:25:41.235015473 [anonymous-instance:fc_api:INFO:src/firecracker/src/api_server/parsed_request.rs:162] The request was executed successfully. Status code: 204 No Content.
+2024-03-18T21:25:41.235038694 [anonymous-instance:fc_api:DEBUG:src/firecracker/src/api_server/mod.rs:115] Total previous API call duration: 102 us.
+2024-03-18T21:25:41.235427289 [anonymous-instance:fc_api:INFO:src/firecracker/src/api_server/parsed_request.rs:69] The API server received a Put request on "/boot-source" with body "{\"kernel_image_path\":\"vmlinux-5.10.209\",\"boot_args\":\"console=ttyS0 reboot=k panic=1 pci=off\"}".
+2024-03-18T21:25:41.235518303 [anonymous-instance:fc_api:INFO:src/firecracker/src/api_server/parsed_request.rs:162] The request was executed successfully. Status code: 204 No Content.
+2024-03-18T21:25:41.235555943 [anonymous-instance:fc_api:DEBUG:src/firecracker/src/api_server/mod.rs:115] Total previous API call duration: 139 us.
+2024-03-18T21:25:41.235943873 [anonymous-instance:fc_api:INFO:src/firecracker/src/api_server/parsed_request.rs:69] The API server received a Put request on "/drives/rootfs" with body "{\"drive_id\":\"rootfs\",\"path_on_host\":\"rootfs.ext4\",\"is_root_device\":true,\"is_read_only\":false}".
+2024-03-18T21:25:41.236167449 [anonymous-instance:fc_api:INFO:src/firecracker/src/api_server/parsed_request.rs:162] The request was executed successfully. Status code: 204 No Content.
+2024-03-18T21:25:41.236196839 [anonymous-instance:fc_api:DEBUG:src/firecracker/src/api_server/mod.rs:115] Total previous API call duration: 264 us.
+2024-03-18T21:25:41.236550557 [anonymous-instance:fc_api:INFO:src/firecracker/src/api_server/parsed_request.rs:69] The API server received a Put request on "/network-interfaces/eth0" with body "{\"iface_id\":\"eth0\",\"guest_mac\":\"06:00:AC:10:00:02\",\"host_dev_name\":\"\"}".
+2024-03-18T21:25:41.237370527 [anonymous-instance:fc_api:INFO:src/firecracker/src/api_server/parsed_request.rs:162] The request was executed successfully. Status code: 204 No Content.
+2024-03-18T21:25:41.237687977 [anonymous-instance:fc_api:DEBUG:src/firecracker/src/api_server/mod.rs:115] Total previous API call duration: 1145 us.
+2024-03-18T21:25:41.253433381 [anonymous-instance:fc_api:INFO:src/firecracker/src/api_server/parsed_request.rs:69] The API server received a Put request on "/actions" with body "{\"action_type\":\"InstanceStart\"}".
+2024-03-18T21:25:41.253594425 [anonymous-instance:main:DEBUG:src/vmm/src/builder.rs:378] event_start: build microvm for boot
+2024-03-18T21:25:41.265745175 [anonymous-instance:main:DEBUG:src/vmm/src/builder.rs:380] event_end: build microvm for boot
+2024-03-18T21:25:41.265791179 [anonymous-instance:main:DEBUG:src/vmm/src/builder.rs:382] event_start: boot microvm
+2024-03-18T21:25:41.265822272 [anonymous-instance:main:INFO:src/vmm/src/device_manager/mmio.rs:384] Artificially kick devices.
+2024-03-18T21:25:41.265939965 [anonymous-instance:main:DEBUG:src/vmm/src/builder.rs:387] event_end: boot microvm
+2024-03-18T21:25:41.266007448 [anonymous-instance:fc_api:INFO:src/firecracker/src/api_server/parsed_request.rs:162] The request was executed successfully. Status code: 204 No Content.
+2024-03-18T21:25:41.266074341 [anonymous-instance:fc_api:DEBUG:src/firecracker/src/api_server/mod.rs:115] Total previous API call duration: 12655 us.
+2024-03-18T21:25:41.281766838 [anonymous-instance:fc_api:INFO:src/firecracker/src/api_server/parsed_request.rs:69] The API server received a Get request on "/machine-config".
+2024-03-18T21:25:41.281921168 [anonymous-instance:fc_api:INFO:src/firecracker/src/api_server/parsed_request.rs:139] The request was executed successfully. Status code: 200 OK.
+2024-03-18T21:25:41.281999061 [anonymous-instance:fc_api:DEBUG:src/firecracker/src/api_server/mod.rs:115] Total previous API call duration: 250 us.
+2024-03-18T21:25:41.285888199 [anonymous-instance:main:ERROR:src/vmm/src/signal_handler.rs:119] Shutting down VM after intercepting signal 1, code 0.
