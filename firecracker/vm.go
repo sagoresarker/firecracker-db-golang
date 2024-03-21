@@ -1,197 +1,153 @@
 package vm
 
 import (
-	"bytes"
-	"encoding/json"
+	"context"
 	"fmt"
 	"io/ioutil"
-	"net"
-	"net/http"
 	"os"
-	"os/exec"
-	"path/filepath"
-	"time"
+	"os/signal"
+	"sync"
+	"syscall"
+
+	"github.com/firecracker-microvm/firecracker-go-sdk"
+	models "github.com/firecracker-microvm/firecracker-go-sdk/client/models"
+	"github.com/sirupsen/logrus"
 )
 
-const (
-	apiSocket      = "/tmp/firecracker1.socket"
-	logFile        = "./firecracker1.log"
-	kernel         = "files/vmlinux-5.10.209"
-	kernelBootArgs = "console=ttyS0 reboot=k panic=1 pci=off"
-	rootFS         = "files/rootfs.ext4"
-	fcMAC          = "06:00:AC:10:00:02"
-	tapIP          = "172.16.0.2"
-)
+func LaunchVM(tapName1 string, tapName2 string) {
 
-type logger struct {
-	LogPath       string `json:"log_path"`
-	Level         string `json:"level"`
-	ShowLevel     bool   `json:"show_level"`
-	ShowLogOrigin bool   `json:"show_log_origin"`
-}
-
-type machineConfig struct {
-	MemSizeMiB uint `json:"mem_size_mib"`
-	VCPUCount  uint `json:"vcpu_count"`
-}
-
-type bootSource struct {
-	KernelImagePath string `json:"kernel_image_path"`
-	BootArgs        string `json:"boot_args"`
-}
-
-type drive struct {
-	DriveID      string `json:"drive_id"`
-	PathOnHost   string `json:"path_on_host"`
-	IsRootDevice bool   `json:"is_root_device"`
-	IsReadOnly   bool   `json:"is_read_only"`
-}
-
-type networkInterface struct {
-	IfaceID     string `json:"iface_id"`
-	GuestMAC    string `json:"guest_mac"`
-	HostDevName string `json:"host_dev_name"`
-}
-
-type action struct {
-	ActionType string `json:"action_type"`
-}
-
-func createSocket() error {
-	apiSocket := "/tmp/firecracker1.socket"
-
-	// Remove existing socket file
-	err := os.RemoveAll(apiSocket)
+	// Read the startup script from a file
+	startupScriptPath := "startup-script/startup-script-vm1.sh"
+	vm1_startupScript, err := ioutil.ReadFile(startupScriptPath)
 	if err != nil {
-		return err
-	}
-
-	// Run the firecracker command
-	cmd := exec.Command("sudo", "./firecracker", "--api-sock", apiSocket)
-	err = cmd.Start()
-	if err != nil {
-		return err
-	}
-
-	// Wait for the firecracker process to start
-	time.Sleep(1 * time.Second)
-
-	return nil
-}
-
-func Vmlaunch() {
-	// Create log file
-	file, err := os.Create(logFile)
-	if err != nil {
-		fmt.Println("Error creating log file:", err)
+		fmt.Printf("Failed to read vm1 startup script: %v\n", err)
 		return
 	}
-	file.Close()
+	cfg1 := firecracker.Config{
+		SocketPath:      "/tmp/firecracker1.sock",
+		LogFifo:         "/tmp/firecracker1.log",
+		MetricsFifo:     "/tmp/firecracker1-metrics",
+		LogLevel:        "Debug",
+		KernelImagePath: "files/vmlinux",
+		KernelArgs:      fmt.Sprintf("ro console=ttyS0 reboot=k panic=1 pci=off %s", vm1_startupScript),
+		MachineCfg: models.MachineConfiguration{
+			VcpuCount:  firecracker.Int64(2),
+			MemSizeMib: firecracker.Int64(256),
+			Smt:        firecracker.Bool(false),
+		},
+		Drives: []models.Drive{
+			{
+				DriveID:      firecracker.String("1"),
+				IsRootDevice: firecracker.Bool(true),
+				IsReadOnly:   firecracker.Bool(false),
+				PathOnHost:   firecracker.String("files/root-drive-with-ssh.img"),
+			},
+		},
+		NetworkInterfaces: []firecracker.NetworkInterface{
+			{
+				StaticConfiguration: &firecracker.StaticNetworkConfiguration{
+					MacAddress:  "10:5b:ad:53:5c:17",
+					HostDevName: "tapName1",
+				},
+			},
+		},
+	}
 
-	// Set log file
-	err = sendRequest("PUT", "http://localhost/logger", &logger{
-		LogPath:       logFile,
-		Level:         "Debug",
-		ShowLevel:     true,
-		ShowLogOrigin: true,
-	})
+	// Read the startup script from a file
+	startupScriptPath2 := "startup-script/startup-script-vm2.sh"
+	vm2_startupScript, err := ioutil.ReadFile(startupScriptPath2)
 	if err != nil {
-		fmt.Println("Error setting log file:", err)
+		fmt.Printf("Failed to read vm2 startup script: %v\n", err)
 		return
 	}
 
-	// Machine config
-	err = sendRequest("PUT", "http://localhost/machine-config", &machineConfig{
-		MemSizeMiB: 2048,
-		VCPUCount:  1,
-	})
+	cfg2 := firecracker.Config{
+		SocketPath:      "/tmp/firecracker2.sock",
+		LogFifo:         "/tmp/firecracker2.log",
+		MetricsFifo:     "/tmp/firecracker2-metrics",
+		LogLevel:        "Debug",
+		KernelImagePath: "files/vmlinux",
+		KernelArgs:      fmt.Sprintf("ro console=ttyS0 reboot=k panic=1 pci=off %s", vm2_startupScript),
+		MachineCfg: models.MachineConfiguration{
+			VcpuCount:  firecracker.Int64(2),
+			MemSizeMib: firecracker.Int64(256),
+			Smt:        firecracker.Bool(false),
+		},
+		Drives: []models.Drive{
+			{
+				DriveID:      firecracker.String("1"),
+				IsRootDevice: firecracker.Bool(true),
+				IsReadOnly:   firecracker.Bool(false),
+				PathOnHost:   firecracker.String("files/root-drive-with-ssh.img"),
+			},
+		},
+		NetworkInterfaces: []firecracker.NetworkInterface{
+			{
+				StaticConfiguration: &firecracker.StaticNetworkConfiguration{
+					MacAddress:  "02:42:27:c3:1c:87",
+					HostDevName: "tapName2",
+				},
+			},
+		},
+	}
+
+	logger := logrus.New()
+	logger.SetLevel(logrus.DebugLevel)
+	entry := logrus.NewEntry(logger)
+
+	ctx := context.Background()
+	m1, err := firecracker.NewMachine(ctx, cfg1, firecracker.WithLogger(entry))
 	if err != nil {
-		fmt.Println("Error setting machine config:", err)
+		fmt.Printf("Failed to create VM1: %v\n", err)
 		return
 	}
 
-	// Set boot source
-	err = sendRequest("PUT", "http://localhost/boot-source", &bootSource{
-		KernelImagePath: kernel,
-		BootArgs:        kernelBootArgs,
-	})
+	m2, err := firecracker.NewMachine(ctx, cfg2, firecracker.WithLogger(entry))
 	if err != nil {
-		fmt.Println("Error setting boot source:", err)
+		fmt.Printf("Failed to create VM2: %v\n", err)
 		return
 	}
 
-	// Set rootfs
-	err = sendRequest("PUT", "http://localhost/drives/rootfs", &drive{
-		DriveID:      "rootfs",
-		PathOnHost:   rootFS,
-		IsRootDevice: true,
-		IsReadOnly:   false,
-	})
-	if err != nil {
-		fmt.Println("Error setting rootfs:", err)
-		return
-	}
+	vmmCtx, vmmCancel := context.WithCancel(ctx)
+	defer vmmCancel()
 
-	// Set network interface
-	tapDev := os.Getenv("TAP_DEV")
-	err = sendRequest("PUT", "http://localhost/network-interfaces/eth0", &networkInterface{
-		IfaceID:     "eth0",
-		GuestMAC:    fcMAC,
-		HostDevName: tapDev,
-	})
-	if err != nil {
-		fmt.Println("Error setting network interface:", err)
-		return
-	}
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 
-	// Sleep to allow configuration to be set
-	time.Sleep(15 * time.Millisecond)
+	go func() {
+		sig := <-sigCh
+		fmt.Printf("Received signal: %s\n", sig)
+		vmmCancel()
+	}()
 
-	// Start microVM
-	err = sendRequest("PUT", "http://localhost/actions", &action{
-		ActionType: "InstanceStart",
-	})
-	if err != nil {
-		fmt.Println("Error starting microVM:", err)
-		return
-	}
+	var wg sync.WaitGroup
+	wg.Add(2)
 
-	// Sleep to allow microVM to start
-	time.Sleep(15 * time.Millisecond)
+	go func() {
+		defer wg.Done()
+		if err := m1.Start(vmmCtx); err != nil {
+			fmt.Printf("Failed to start VM1: %v\n", err)
+			return
+		}
+		if err := m1.Wait(vmmCtx); err != nil {
+			fmt.Printf("VM1 exited with error: %v\n", err)
+		} else {
+			fmt.Println("VM1 exited successfully")
+		}
+	}()
 
-	// SSH into the microVM
-	keyPath, _ := filepath.Abs("./key_pairs/id_rsa")
-	fmt.Println("To ssh into the microVM run: ssh -i", keyPath, "root@"+tapIP)
-	fmt.Println("Use 'root' for both the login and password. Run 'reboot' to exit.")
-}
+	go func() {
+		defer wg.Done()
+		if err := m2.Start(vmmCtx); err != nil {
+			fmt.Printf("Failed to start VM2: %v\n", err)
+			return
+		}
+		if err := m2.Wait(vmmCtx); err != nil {
+			fmt.Printf("VM2 exited with error: %v\n", err)
+		} else {
+			fmt.Println("VM2 exited successfully")
+		}
+	}()
 
-func sendRequest(method, url string, payload interface{}) error {
-	data, err := json.Marshal(payload)
-	if err != nil {
-		return err
-	}
-
-	conn, err := net.Dial("unix", apiSocket)
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
-
-	req, err := http.NewRequest(method, url, bytes.NewBuffer(data))
-	if err != nil {
-		return err
-	}
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := ioutil.ReadAll(resp.Body)
-		return fmt.Errorf("HTTP request failed with status code %d: %s", resp.StatusCode, body)
-	}
-
-	return nil
+	wg.Wait()
 }

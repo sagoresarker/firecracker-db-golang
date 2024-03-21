@@ -27,14 +27,19 @@ func createTap(tapName string, bridgeName string) error {
 	return nil
 }
 
-func SetupTapNetwork(bridgeName string) (string, error) {
+func SetupTapNetwork(bridgeName string) (string, string, error) {
 	fmt.Println("Setting up tap")
 
-	tapName := "tap-" + bridgeName
+	tapName1 := "tap-" + bridgeName + "1"
+	tapName2 := "tap-" + bridgeName + "2"
 
-	if err := createTap(tapName, bridgeName); err != nil {
-		fmt.Println("Error creating tap:", err)
-		return "", err
+	if err := createTap(tapName1, bridgeName); err != nil {
+		fmt.Println("Error creating tap for VM1:", err)
+		return "", "", err
 	}
-	return tapName, nil
+	if err := createTap(tapName2, bridgeName); err != nil {
+		fmt.Println("Error creating tap for VM2:", err)
+		return "", "", err
+	}
+	return tapName1, tapName2, nil
 }

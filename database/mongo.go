@@ -43,7 +43,7 @@ func InitMongoDB() {
 	log.Println("Connected to MongoDB!")
 }
 
-func SaveNetworkDetails(bridgeName string, tapName string, userID string, ipAddress string) error {
+func SaveNetworkDetails(bridgeName string, tapName1 string, tapName2 string, userID string, ipAddress string) error {
 	if mongoClient == nil {
 		log.Fatal("MongoDB client not initialized.")
 		return nil
@@ -55,7 +55,8 @@ func SaveNetworkDetails(bridgeName string, tapName string, userID string, ipAddr
 		{Key: "bridgeName", Value: bridgeName},
 		// {Key: "tapID", Value: tapId},
 
-		{Key: "tapName", Value: tapName},
+		{Key: "tapName1", Value: tapName1},
+		{Key: "tapName2", Value: tapName2},
 		{Key: "ipAddress", Value: ipAddress},
 		{Key: "created_at", Value: time.Now()},
 	}
