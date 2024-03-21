@@ -3,7 +3,7 @@ package vm
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"net"
 	"os"
 	"os/signal"
 	"sync"
@@ -11,25 +11,96 @@ import (
 
 	"github.com/firecracker-microvm/firecracker-go-sdk"
 	models "github.com/firecracker-microvm/firecracker-go-sdk/client/models"
+	"github.com/sagoresarker/firecracker-db-golang/networking"
 	"github.com/sirupsen/logrus"
 )
+
+func getVMIPs(bridgeIP string) (string, string, string, error) {
+	// Parse the bridge IP address
+	ip := net.ParseIP(bridgeIP)
+	if ip == nil {
+		return "", "", "", fmt.Errorf("invalid bridge IP address")
+	}
+
+	// Convert the IP address to IPv4
+	ip = ip.To4()
+
+	// Ensure the IP address is in the correct range for a /24 subnet
+	if ip[3] != 1 {
+		return "", "", "", fmt.Errorf("bridge IP address is not in the correct range for a /24 subnet")
+	}
+
+	// Get the network address and subnet mask
+	network := ip.Mask(net.CIDRMask(24, 32))
+	mask := net.CIDRMask(24, 32)
+
+	// Calculate the broadcast address
+	broadcast := net.IP(make([]byte, 4))
+	for i := range broadcast {
+		broadcast[i] = ip[i] | ^mask[i]
+	}
+
+	// Get the first two IP addresses in the subnet excluding the network address and broadcast address
+	ip1 := net.IP(make([]byte, 4))
+	ip2 := net.IP(make([]byte, 4))
+	copy(ip1, network)
+	copy(ip2, network)
+
+	// Increment the last octet for the second and third IP address
+	ip1[3] += 2
+	ip2[3] += 3
+
+	return ip1.String(), ip2.String(), broadcast.String(), nil
+}
 
 func LaunchVM(tapName1 string, tapName2 string) {
 
 	// Read the startup script from a file
-	startupScriptPath := "startup-script/startup-script-vm1.sh"
-	vm1_startupScript, err := ioutil.ReadFile(startupScriptPath)
+	// startupScriptPath := "startup-script/startup-script-vm1.sh"
+	// vm1_startupScript, err := ioutil.ReadFile(startupScriptPath)
+	// if err != nil {
+	// 	fmt.Printf("Failed to read vm1 startup script: %v\n", err)
+	// 	return
+	// }
+
+	bridgeIP := networking.BridgeIPAddress()
+
+	bridge_ip_without_mask, _, err := net.ParseCIDR(bridgeIP)
 	if err != nil {
-		fmt.Printf("Failed to read vm1 startup script: %v\n", err)
+		fmt.Println("Error parsing bridge IP address:", err)
 		return
 	}
+
+	vm1_eth0_ip, vm2_eth0_ip, gateway_ip, err := getVMIPs(bridge_ip_without_mask.String())
+
+	if err != nil {
+		fmt.Println("Error getting VM IPs:", err)
+		return
+	}
+
+	fmt.Printf("VM1 IP: %s\n", vm1_eth0_ip)
+	fmt.Printf("VM2 IP: %s\n", vm2_eth0_ip)
+	fmt.Printf("Gateway IP: %s\n", gateway_ip)
+
+	script := fmt.Sprintf(`#!/bin/bash
+
+	# Add the bridge IP address to the eth0 interface
+	ip addr add %s/24 dev eth0
+
+	# Bring the eth0 interface up
+	ip link set eth0 up
+
+	# Add a default route via the bridge IP
+	ip route add default via %s dev eth0
+	`, vm1_eth0_ip, gateway_ip)
+
 	cfg1 := firecracker.Config{
 		SocketPath:      "/tmp/firecracker1.sock",
 		LogFifo:         "/tmp/firecracker1.log",
 		MetricsFifo:     "/tmp/firecracker1-metrics",
 		LogLevel:        "Debug",
 		KernelImagePath: "files/vmlinux",
-		KernelArgs:      fmt.Sprintf("ro console=ttyS0 reboot=k panic=1 pci=off %s", vm1_startupScript),
+		KernelArgs:      fmt.Sprintf("ro console=ttyS0 reboot=k panic=1 pci=off %s", script),
 		MachineCfg: models.MachineConfiguration{
 			VcpuCount:  firecracker.Int64(2),
 			MemSizeMib: firecracker.Int64(256),
@@ -53,13 +124,19 @@ func LaunchVM(tapName1 string, tapName2 string) {
 		},
 	}
 
-	// Read the startup script from a file
-	startupScriptPath2 := "startup-script/startup-script-vm2.sh"
-	vm2_startupScript, err := ioutil.ReadFile(startupScriptPath2)
-	if err != nil {
-		fmt.Printf("Failed to read vm2 startup script: %v\n", err)
-		return
-	}
+	// // Read the startup script from a file
+	// startupScriptPath2 := "startup-script/startup-script-vm2.sh"
+	// vm2_startupScript, err := ioutil.ReadFile(startupScriptPath2)
+	// if err != nil {
+	// 	fmt.Printf("Failed to read vm2 startup script: %v\n", err)
+	// 	return
+	// }
+
+	script2 := fmt.Sprintf(`#!/bin/bash
+	ip addr add %s/24 dev eth0
+	ip link set eth0 up
+	ip route add default via %s dev eth0
+	`, vm2_eth0_ip, gateway_ip)
 
 	cfg2 := firecracker.Config{
 		SocketPath:      "/tmp/firecracker2.sock",
@@ -67,7 +144,7 @@ func LaunchVM(tapName1 string, tapName2 string) {
 		MetricsFifo:     "/tmp/firecracker2-metrics",
 		LogLevel:        "Debug",
 		KernelImagePath: "files/vmlinux",
-		KernelArgs:      fmt.Sprintf("ro console=ttyS0 reboot=k panic=1 pci=off %s", vm2_startupScript),
+		KernelArgs:      fmt.Sprintf("ro console=ttyS0 reboot=k panic=1 pci=off %s", script2),
 		MachineCfg: models.MachineConfiguration{
 			VcpuCount:  firecracker.Int64(2),
 			MemSizeMib: firecracker.Int64(256),

@@ -25,3 +25,8 @@ func GetTapNames() (string, string) {
 
 	return tapName1, tapName2
 }
+
+func BridgeIPAddress() string {
+	_, _, ipAddress := SetupBridgeNetwork()
+	return ipAddress
+}

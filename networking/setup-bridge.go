@@ -35,11 +35,12 @@ func generateIPAddress(startRange, endRange string) (string, error) {
 
 	// Generate a random IP address within the range
 	randomIP := make(net.IP, 4)
-	ipInt := rand.Intn(end-start+1) + start
+	ipInt := rand.Intn((end-start)/256) + start // Divide by 256 to ensure the last octet is always 0
+
 	randomIP[0] = byte(ipInt >> 24 & 0xFF)
 	randomIP[1] = byte(ipInt >> 16 & 0xFF)
 	randomIP[2] = byte(ipInt >> 8 & 0xFF)
-	randomIP[3] = byte(ipInt & 0xFF)
+	randomIP[3] = 1 // Set the last octet to 1
 
 	return randomIP.String(), nil
 }
