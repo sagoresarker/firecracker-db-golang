@@ -26,7 +26,7 @@ func getVMIPs(bridgeIP string) (string, string, string, error) {
 	ip = ip.To4()
 
 	// Ensure the IP address is in the correct range for a /24 subnet
-	if ip[3] != 1 {
+	if ip[3] != 7 {
 		return "", "", "", fmt.Errorf("bridge IP address is not in the correct range for a /24 subnet")
 	}
 
