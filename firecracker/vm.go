@@ -63,9 +63,9 @@ func LaunchVM(tapName1 string, tapName2 string) {
 	// 	return
 	// }
 
-	bridgeIP := networking.BridgeIPAddress()
+	bridge_ip_address, _ := networking.GetBridgeIPAddress()
 
-	bridge_ip_without_mask, _, err := net.ParseCIDR(bridgeIP)
+	bridge_ip_without_mask, _, err := net.ParseCIDR(bridge_ip_address)
 	if err != nil {
 		fmt.Println("Error parsing bridge IP address:", err)
 		return
@@ -83,16 +83,10 @@ func LaunchVM(tapName1 string, tapName2 string) {
 	fmt.Printf("Gateway IP: %s\n", gateway_ip)
 
 	script := fmt.Sprintf(`#!/bin/bash
-
-	# Add the bridge IP address to the eth0 interface
 	ip addr add %s/24 dev eth0
-
-	# Bring the eth0 interface up
 	ip link set eth0 up
-
-	# Add a default route via the bridge IP
 	ip route add default via %s dev eth0
-	`, vm1_eth0_ip, gateway_ip)
+	`, vm1_eth0_ip, bridge_ip_address)
 
 	cfg1 := firecracker.Config{
 		SocketPath:      "/tmp/firecracker1.sock",
@@ -100,7 +94,9 @@ func LaunchVM(tapName1 string, tapName2 string) {
 		MetricsFifo:     "/tmp/firecracker1-metrics",
 		LogLevel:        "Debug",
 		KernelImagePath: "files/vmlinux",
-		KernelArgs:      fmt.Sprintf("ro console=ttyS0 reboot=k panic=1 pci=off %s", script),
+		KernelArgs:      fmt.Sprintf("ro console=tty0 reboot=k panic=1 pci=off %s", script),
+		//KernelArgs: "console=tty0 console=ttyS0 reboot=k panic=1 pci=off",
+
 		MachineCfg: models.MachineConfiguration{
 			VcpuCount:  firecracker.Int64(2),
 			MemSizeMib: firecracker.Int64(256),
@@ -136,7 +132,7 @@ func LaunchVM(tapName1 string, tapName2 string) {
 	ip addr add %s/24 dev eth0
 	ip link set eth0 up
 	ip route add default via %s dev eth0
-	`, vm2_eth0_ip, gateway_ip)
+	`, vm2_eth0_ip, bridge_ip_address)
 
 	cfg2 := firecracker.Config{
 		SocketPath:      "/tmp/firecracker2.sock",
@@ -144,7 +140,8 @@ func LaunchVM(tapName1 string, tapName2 string) {
 		MetricsFifo:     "/tmp/firecracker2-metrics",
 		LogLevel:        "Debug",
 		KernelImagePath: "files/vmlinux",
-		KernelArgs:      fmt.Sprintf("ro console=ttyS0 reboot=k panic=1 pci=off %s", script2),
+		KernelArgs:      fmt.Sprintf("ro console=tty0 reboot=k panic=1 pci=off %s", script2),
+		//KernelArgs: "console=tty0 console=ttyS0 reboot=k panic=1 pci=off",
 		MachineCfg: models.MachineConfiguration{
 			VcpuCount:  firecracker.Int64(2),
 			MemSizeMib: firecracker.Int64(256),

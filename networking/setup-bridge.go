@@ -20,13 +20,13 @@ func generateUserID() string {
 	return string(b)
 }
 
-func generateIPAddress(startRange, endRange string) (string, error) {
+func generateBridgeIPAddress(startRange, endRange string) (string, string, error) {
 	// Parse start and end IP addresses
 	startIP := net.ParseIP(startRange).To4()
 	endIP := net.ParseIP(endRange).To4()
 
 	if startIP == nil || endIP == nil {
-		return "", fmt.Errorf("invalid IP address range")
+		return "", "", fmt.Errorf("invalid IP address range")
 	}
 
 	// Convert IP addresses to integers
@@ -40,12 +40,18 @@ func generateIPAddress(startRange, endRange string) (string, error) {
 	randomIP[0] = byte(ipInt >> 24 & 0xFF)
 	randomIP[1] = byte(ipInt >> 16 & 0xFF)
 	randomIP[2] = byte(ipInt >> 8 & 0xFF)
-	randomIP[3] = 1 // Set the last octet to 1
+	randomIP[3] = 7 // Set the last octet to 1
 
-	return randomIP.String(), nil
+	bridgeIp := randomIP.String()
+
+	randomIP[3] = 1
+
+	gateway_ip := randomIP.String()
+
+	return bridgeIp, gateway_ip, nil
 }
 
-func generateValue() (bridgeName string, userID string, ipAddress string) {
+func generateValue() (bridgeName string, userID string, bridge_ip_address string, gateway_ip string) {
 	fmt.Println("Generate a value for bridge-name, user-id and ip-address")
 
 	startRange := "10.0.0.0"
@@ -54,16 +60,16 @@ func generateValue() (bridgeName string, userID string, ipAddress string) {
 	userID = generateUserID()
 	bridgeName = "br-" + userID
 
-	ip, err := generateIPAddress(startRange, endRange)
+	bridge_ip_address, gateway_ip, err := generateBridgeIPAddress(startRange, endRange)
 
 	if err != nil {
 		fmt.Println("Error Generating IP adress:", err)
 		return
 	}
 
-	ipAddress = ip + "/24"
+	bridge_ip_address = bridge_ip_address + "/24"
 
-	return bridgeName, userID, ipAddress
+	return bridgeName, userID, bridge_ip_address, gateway_ip
 
 }
 
@@ -99,19 +105,20 @@ func createBridge(bridgeName string, ipAddress string) error {
 	return nil
 }
 
-func SetupBridgeNetwork() (bridge string, userID string, ipAddress string) {
+func SetupBridgeNetwork() (bridge string, userID string, bridge_ip_address string, bridge_gateway_ip string) {
 	fmt.Println("Setting up bridge")
 
-	bridgeName, userID, ipAddress := generateValue()
+	bridgeName, userID, bridge_ip_address, bridge_gateway_ip := generateValue()
 
 	fmt.Println("Bridge Name:", bridgeName)
 	fmt.Println("User ID:", userID)
-	fmt.Println("IP Address:", ipAddress)
+	fmt.Println("bridge_ip_address:", bridge_ip_address)
+	fmt.Println("bridge_gateway_ip:", bridge_gateway_ip)
 
-	if err := createBridge(bridgeName, ipAddress); err != nil {
+	if err := createBridge(bridgeName, bridge_ip_address); err != nil {
 		fmt.Println("Error creating bridge:", err)
 		return
 	}
 
-	return bridgeName, userID, ipAddress
+	return bridgeName, userID, bridge_ip_address, bridge_gateway_ip
 }

@@ -8,3 +8,8 @@ firecracker_src
 
 release-v1.7.0-x86_64
 bash-script
+
+
+root-drive-ssh-key
+root-drive-with-ssh.img
+vmlinux
