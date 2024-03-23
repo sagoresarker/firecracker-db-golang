@@ -118,7 +118,7 @@ func LaunchSecondVM(tapName1 string, tapName2 string) {
 	}()
 
 	var wg sync.WaitGroup
-	wg.Add(2)
+	wg.Add(1)
 
 	go func() {
 		defer wg.Done()
