@@ -24,5 +24,5 @@ func main() {
 
 	tapName1, tapName2 := networking.GetTapNames()
 
-	vm.LaunchVM(tapName1, tapName2)
+	vm.LaunchFirstVM(tapName1, tapName2)
 }

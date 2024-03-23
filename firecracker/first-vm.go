@@ -15,45 +15,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func getVMIPs(bridgeIP string) (string, string, string, error) {
-	// Parse the bridge IP address
-	ip := net.ParseIP(bridgeIP)
-	if ip == nil {
-		return "", "", "", fmt.Errorf("invalid bridge IP address")
-	}
-
-	// Convert the IP address to IPv4
-	ip = ip.To4()
-
-	// Ensure the IP address is in the correct range for a /24 subnet
-	if ip[3] != 7 {
-		return "", "", "", fmt.Errorf("bridge IP address is not in the correct range for a /24 subnet")
-	}
-
-	// Get the network address and subnet mask
-	network := ip.Mask(net.CIDRMask(24, 32))
-	mask := net.CIDRMask(24, 32)
-
-	// Calculate the broadcast address
-	broadcast := net.IP(make([]byte, 4))
-	for i := range broadcast {
-		broadcast[i] = ip[i] | ^mask[i]
-	}
-
-	// Get the first two IP addresses in the subnet excluding the network address and broadcast address
-	ip1 := net.IP(make([]byte, 4))
-	ip2 := net.IP(make([]byte, 4))
-	copy(ip1, network)
-	copy(ip2, network)
-
-	// Increment the last octet for the second and third IP address
-	ip1[3] += 2
-	ip2[3] += 3
-
-	return ip1.String(), ip2.String(), broadcast.String(), nil
-}
-
-func LaunchVM(tapName1 string, tapName2 string) {
+func LaunchFirstVM(tapName1 string, tapName2 string) {
 
 	// Read the startup script from a file
 	// startupScriptPath := "startup-script/startup-script-vm1.sh"
@@ -71,7 +33,7 @@ func LaunchVM(tapName1 string, tapName2 string) {
 		return
 	}
 
-	vm1_eth0_ip, vm2_eth0_ip, gateway_ip, err := getVMIPs(bridge_ip_without_mask.String())
+	vm1_eth0_ip, _, err := networking.GetVMIPs(bridge_ip_without_mask.String())
 
 	if err != nil {
 		fmt.Println("Error getting VM IPs:", err)
@@ -79,14 +41,12 @@ func LaunchVM(tapName1 string, tapName2 string) {
 	}
 
 	fmt.Printf("VM1 IP: %s\n", vm1_eth0_ip)
-	fmt.Printf("VM2 IP: %s\n", vm2_eth0_ip)
-	fmt.Printf("Gateway IP: %s\n", gateway_ip)
 
-	script := fmt.Sprintf(`#!/bin/bash
-	ip addr add %s/24 dev eth0
-	ip link set eth0 up
-	ip route add default via %s dev eth0
-	`, vm1_eth0_ip, bridge_ip_address)
+	// script := fmt.Sprintf(`#!/bin/bash
+	// ip addr add %s/24 dev eth0
+	// ip link set eth0 up
+	// ip route add default via %s dev eth0
+	// `, vm1_eth0_ip, bridge_ip_address)
 
 	cfg1 := firecracker.Config{
 		SocketPath:      "/tmp/firecracker1.sock",
@@ -94,8 +54,8 @@ func LaunchVM(tapName1 string, tapName2 string) {
 		MetricsFifo:     "/tmp/firecracker1-metrics",
 		LogLevel:        "Debug",
 		KernelImagePath: "files/vmlinux",
-		KernelArgs:      fmt.Sprintf("ro console=tty0 reboot=k panic=1 pci=off %s", script),
-		//KernelArgs: "console=tty0 console=ttyS0 reboot=k panic=1 pci=off",
+		//KernelArgs:      fmt.Sprintf("ro console=ttyS0 reboot=k panic=1 pci=off %s", script),
+		KernelArgs: "ro console=tty0 console=ttyS0 reboot=k panic=1 pci=off",
 
 		MachineCfg: models.MachineConfiguration{
 			VcpuCount:  firecracker.Int64(2),
@@ -128,11 +88,11 @@ func LaunchVM(tapName1 string, tapName2 string) {
 	// 	return
 	// }
 
-	script2 := fmt.Sprintf(`#!/bin/bash
-	ip addr add %s/24 dev eth0
-	ip link set eth0 up
-	ip route add default via %s dev eth0
-	`, vm2_eth0_ip, bridge_ip_address)
+	// script2 := fmt.Sprintf(`#!/bin/bash
+	// ip addr add %s/24 dev eth0
+	// ip link set eth0 up
+	// ip route add default via %s dev eth0
+	// `, vm2_eth0_ip, bridge_ip_address)
 
 	cfg2 := firecracker.Config{
 		SocketPath:      "/tmp/firecracker2.sock",
@@ -140,8 +100,8 @@ func LaunchVM(tapName1 string, tapName2 string) {
 		MetricsFifo:     "/tmp/firecracker2-metrics",
 		LogLevel:        "Debug",
 		KernelImagePath: "files/vmlinux",
-		KernelArgs:      fmt.Sprintf("ro console=tty0 reboot=k panic=1 pci=off %s", script2),
-		//KernelArgs: "console=tty0 console=ttyS0 reboot=k panic=1 pci=off",
+		// KernelArgs:      fmt.Sprintf("ro console=tty0 reboot=k panic=1 pci=off %s", script2),
+		KernelArgs: "ro console=tty0 console=ttyS0 reboot=k panic=1 pci=off",
 		MachineCfg: models.MachineConfiguration{
 			VcpuCount:  firecracker.Int64(2),
 			MemSizeMib: firecracker.Int64(256),
