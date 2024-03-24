@@ -1,0 +1,6 @@
+#cloud-config
+runcmd:
+  - ip link set eth0 up
+  - while ! ip link show eth0 | grep -q "state UP"; do sleep 1; done
+  - ip addr add 10.0.219.2/24 dev eth0
+  - ip route add default via 10.0.219.7/24 dev eth0

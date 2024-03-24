@@ -105,7 +105,7 @@ func createBridge(bridgeName string, ipAddress string) error {
 	return nil
 }
 
-func SetupBridgeNetwork() (bridge string, userID string, bridge_ip_address string, bridge_gateway_ip string) {
+func SetupBridgeNetwork() (bridge string, userID string, bridge_ip_address string, bridge_gateway_ip string, err error) {
 	fmt.Println("Setting up bridge")
 
 	bridgeName, userID, bridge_ip_address, bridge_gateway_ip := generateValue()
@@ -115,10 +115,10 @@ func SetupBridgeNetwork() (bridge string, userID string, bridge_ip_address strin
 	fmt.Println("bridge_ip_address:", bridge_ip_address)
 	fmt.Println("bridge_gateway_ip:", bridge_gateway_ip)
 
-	if err := createBridge(bridgeName, bridge_ip_address); err != nil {
+	if err = createBridge(bridgeName, bridge_ip_address); err != nil {
 		fmt.Println("Error creating bridge:", err)
 		return
 	}
 
-	return bridgeName, userID, bridge_ip_address, bridge_gateway_ip
+	return bridgeName, userID, bridge_ip_address, bridge_gateway_ip, nil
 }

@@ -32,6 +32,7 @@ func LaunchFirstVM(tapName1 string, tapName2 string) {
 		fmt.Println("Error parsing bridge IP address:", err)
 		return
 	}
+	fmt.Println("(Launch VM) - Bridge IP without mask:", bridge_ip_without_mask)
 
 	vm1_eth0_ip, _, err := networking.GetVMIPs(bridge_ip_without_mask.String())
 
@@ -41,10 +42,15 @@ func LaunchFirstVM(tapName1 string, tapName2 string) {
 	}
 
 	fmt.Printf("VM1 IP: %s\n", vm1_eth0_ip)
+	vm1_eth0_ip_ipv4 := net.ParseIP(vm1_eth0_ip)
+	if vm1_eth0_ip_ipv4 == nil {
+		fmt.Println("Error parsing VM1 IP address")
+		return
+	}
 
 	// script := fmt.Sprintf(`#!/bin/bash
-	// ip addr add %s/24 dev eth0
 	// ip link set eth0 up
+	// ip addr add %s/24 dev eth0
 	// ip route add default via %s dev eth0
 	// `, vm1_eth0_ip, bridge_ip_address)
 
@@ -75,6 +81,18 @@ func LaunchFirstVM(tapName1 string, tapName2 string) {
 				StaticConfiguration: &firecracker.StaticNetworkConfiguration{
 					MacAddress:  "10:5b:ad:53:5c:17",
 					HostDevName: "tapName1",
+					IPConfiguration: &firecracker.IPConfiguration{
+						IPAddr: net.IPNet{
+							IP:   vm1_eth0_ip_ipv4,
+							Mask: net.CIDRMask(24, 32),
+						},
+						Gateway: bridge_ip_without_mask,
+						IfName:  "eth0",
+						Nameservers: []string{
+							"8.8.8.8",
+							"8.8.4.4",
+						},
+					},
 				},
 			},
 		},

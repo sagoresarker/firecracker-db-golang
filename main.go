@@ -14,13 +14,13 @@ func main() {
 
 	networking.SetUpNetwork()
 
-	bridgeDetails, err := database.GetBridgeDetails()
-	if err != nil {
-		fmt.Println("Error getting bridge details:", err)
-		return
-	}
+	// bridgeDetails, err := database.GetBridgeDetails()
+	// if err != nil {
+	// 	fmt.Println("Error getting bridge details:", err)
+	// 	return
+	// }
 
-	fmt.Println("Bridge Details:", bridgeDetails)
+	// fmt.Println("Bridge Details:", bridgeDetails)
 
 	tapName1, tapName2 := networking.GetTapNames()
 
