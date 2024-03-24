@@ -69,7 +69,7 @@ func LaunchFirstVM(tapName1 string, tapName2 string) {
 			{
 				StaticConfiguration: &firecracker.StaticNetworkConfiguration{
 					MacAddress:  "10:5b:ad:53:5c:17",
-					HostDevName: "tapName1",
+					HostDevName: tapName1,
 					IPConfiguration: &firecracker.IPConfiguration{
 						IPAddr: net.IPNet{
 							IP:   vm1_eth0_ip_ipv4,

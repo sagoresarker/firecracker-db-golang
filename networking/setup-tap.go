@@ -22,7 +22,7 @@ func createTap(tapName string, bridgeName string) error {
 		return fmt.Errorf("failed to assign tap to bridge: %v", err)
 	}
 
-	fmt.Printf("Tap %s assigned to Bridge Address %s\n", tapName, bridgeName)
+	fmt.Printf("Tap %s assigned to Bridge %s\n", tapName, bridgeName)
 
 	return nil
 }
@@ -30,8 +30,8 @@ func createTap(tapName string, bridgeName string) error {
 func SetupTapNetwork(bridgeName string) (string, string, error) {
 	fmt.Println("Setting up tap")
 
-	tapName1 := "tap-" + bridgeName + "1"
-	tapName2 := "tap-" + bridgeName + "2"
+	tapName1 := "tap-" + bridgeName + "-1"
+	tapName2 := "tap-" + bridgeName + "-2"
 
 	if err := createTap(tapName1, bridgeName); err != nil {
 		fmt.Println("Error creating tap for VM1:", err)
