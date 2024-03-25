@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"reflect"
 	"sync"
 	"syscall"
 
@@ -17,7 +18,7 @@ import (
 
 func LaunchFirstVM(tapName1 string, tapName2 string) {
 	fmt.Println("Launching first VM")
-	bridge_ip_address, _ := networking.GetBridgeIPAddress()
+	bridge_ip_address, bridge_gateway_ip := networking.GetBridgeIPAddress()
 
 	bridge_ip_without_mask, _, err := net.ParseCIDR(bridge_ip_address)
 	if err != nil {
@@ -42,6 +43,14 @@ func LaunchFirstVM(tapName1 string, tapName2 string) {
 		return
 	}
 
+	bridge_gateway_ip_ipv4 := net.ParseIP(bridge_gateway_ip)
+	fmt.Printf("Bridge Gateway IP: %s and Type %s\n", bridge_gateway_ip_ipv4, reflect.TypeOf(bridge_gateway_ip_ipv4).String())
+
+	if bridge_gateway_ip_ipv4 == nil {
+		fmt.Println("Error parsing bridge gateway IP address")
+		return
+	}
+
 	fmt.Println("tapName1 in LaunchFirstVM:", tapName1)
 
 	cfg1 := firecracker.Config{
@@ -50,7 +59,7 @@ func LaunchFirstVM(tapName1 string, tapName2 string) {
 		MetricsFifo:     "/tmp/firecracker1-metrics",
 		LogLevel:        "Debug",
 		KernelImagePath: "files/vmlinux",
-		KernelArgs:      "ro console=tty0 console=ttyS0 reboot=k panic=1 pci=off",
+		KernelArgs:      "ro console=ttyS0 reboot=k panic=1 pci=off",
 
 		MachineCfg: models.MachineConfiguration{
 			VcpuCount:  firecracker.Int64(2),
@@ -75,7 +84,7 @@ func LaunchFirstVM(tapName1 string, tapName2 string) {
 							IP:   vm1_eth0_ip_ipv4,
 							Mask: net.CIDRMask(24, 32),
 						},
-						Gateway: bridge_ip_without_mask,
+						Gateway: bridge_gateway_ip_ipv4,
 						IfName:  "eth0",
 						Nameservers: []string{
 							"8.8.8.8",

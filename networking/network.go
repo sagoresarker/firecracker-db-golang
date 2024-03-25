@@ -8,14 +8,15 @@ import (
 
 var (
 	tapName1, tapName2       string
-	bridge_ip_address_global = "Blank"
-	bridge_gateway_ip_global = "Blank"
+	bridge_ip_address_global = ""
+	bridge_gateway_ip_global = ""
 )
 
 func SetUpNetwork() {
 	fmt.Println("Setup full networking")
-	bridgeName, userID, bridge_ip_address, _, err := SetupBridgeNetwork()
+	bridgeName, userID, bridge_ip_address, bridge_gateway_ip, err := SetupBridgeNetwork()
 	bridge_ip_address_global = bridge_ip_address
+	bridge_gateway_ip_global = bridge_gateway_ip
 
 	if err != nil {
 		fmt.Println("(From SetUp network) - Error setting up bridge network:", err)
