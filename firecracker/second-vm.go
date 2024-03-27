@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"reflect"
 	"sync"
 	"syscall"
 
@@ -15,23 +16,17 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func LaunchSecondVM(tapName1 string, tapName2 string) {
-
-	// Read the startup script from a file
-	// startupScriptPath := "startup-script/startup-script-vm1.sh"
-	// vm1_startupScript, err := ioutil.ReadFile(startupScriptPath)
-	// if err != nil {
-	// 	fmt.Printf("Failed to read vm1 startup script: %v\n", err)
-	// 	return
-	// }
-
-	bridge_ip_address, _ := networking.GetBridgeIPAddress()
+func LaunchSecondVM(tapName2 string) {
+	fmt.Println("Launching second VM")
+	bridge_ip_address, bridge_gateway_ip := networking.GetBridgeIPAddress()
 
 	bridge_ip_without_mask, _, err := net.ParseCIDR(bridge_ip_address)
 	if err != nil {
 		fmt.Println("Error parsing bridge IP address:", err)
 		return
 	}
+
+	fmt.Println("(Launch VM) - Bridge IP without mask:", bridge_ip_without_mask)
 
 	_, vm2_eth0_ip, err := networking.GetVMIPs(bridge_ip_without_mask.String())
 
@@ -42,34 +37,30 @@ func LaunchSecondVM(tapName1 string, tapName2 string) {
 
 	fmt.Printf("VM2 IP: %s\n", vm2_eth0_ip)
 
-	// script := fmt.Sprintf(`#!/bin/bash
-	// ip addr add %s/24 dev eth0
-	// ip link set eth0 up
-	// ip route add default via %s dev eth0
-	// `, vm1_eth0_ip, bridge_ip_address)
+	vm1_eth0_ip_ipv4 := net.ParseIP(vm2_eth0_ip)
+	if vm1_eth0_ip_ipv4 == nil {
+		fmt.Println("Error parsing VM1 IP address")
+		return
+	}
 
-	// // Read the startup script from a file
-	// startupScriptPath2 := "startup-script/startup-script-vm2.sh"
-	// vm2_startupScript, err := ioutil.ReadFile(startupScriptPath2)
-	// if err != nil {
-	// 	fmt.Printf("Failed to read vm2 startup script: %v\n", err)
-	// 	return
-	// }
+	bridge_gateway_ip_ipv4 := net.ParseIP(bridge_gateway_ip)
+	fmt.Printf("Bridge Gateway IP: %s and Type %s\n", bridge_gateway_ip_ipv4, reflect.TypeOf(bridge_gateway_ip_ipv4).String())
 
-	// script2 := fmt.Sprintf(`#!/bin/bash
-	// ip addr add %s/24 dev eth0
-	// ip link set eth0 up
-	// ip route add default via %s dev eth0
-	// `, vm2_eth0_ip, bridge_ip_address)
+	if bridge_gateway_ip_ipv4 == nil {
+		fmt.Println("Error parsing bridge gateway IP address")
+		return
+	}
 
-	cfg2 := firecracker.Config{
+	fmt.Println("tapName1 in LaunchSecondVM:", tapName2)
+
+	cfg1 := firecracker.Config{
 		SocketPath:      "/tmp/firecracker2.sock",
 		LogFifo:         "/tmp/firecracker2.log",
 		MetricsFifo:     "/tmp/firecracker2-metrics",
 		LogLevel:        "Debug",
-		KernelImagePath: "files/vmlinux",
-		// KernelArgs:      fmt.Sprintf("ro console=tty0 reboot=k panic=1 pci=off %s", script2),
-		KernelArgs: "ro console=tty0 console=ttyS0 reboot=k panic=1 pci=off",
+		KernelImagePath: "files/nodejs/vmlinux",
+		KernelArgs:      "ro console=ttyS0 reboot=k panic=1 pci=off",
+
 		MachineCfg: models.MachineConfiguration{
 			VcpuCount:  firecracker.Int64(2),
 			MemSizeMib: firecracker.Int64(256),
@@ -80,14 +71,26 @@ func LaunchSecondVM(tapName1 string, tapName2 string) {
 				DriveID:      firecracker.String("1"),
 				IsRootDevice: firecracker.Bool(true),
 				IsReadOnly:   firecracker.Bool(false),
-				PathOnHost:   firecracker.String("files/root-drive-with-ssh.img"),
+				PathOnHost:   firecracker.String("files/nodejs/nodejs-runtime.ext4"),
 			},
 		},
 		NetworkInterfaces: []firecracker.NetworkInterface{
 			{
 				StaticConfiguration: &firecracker.StaticNetworkConfiguration{
-					MacAddress:  "02:42:27:c3:1c:87",
-					HostDevName: "tapName2",
+					MacAddress:  "10:5b:ad:53:5c:17",
+					HostDevName: tapName2,
+					IPConfiguration: &firecracker.IPConfiguration{
+						IPAddr: net.IPNet{
+							IP:   vm1_eth0_ip_ipv4,
+							Mask: net.CIDRMask(24, 32),
+						},
+						Gateway: bridge_ip_without_mask,
+						IfName:  "eth0",
+						Nameservers: []string{
+							"8.8.8.8",
+							"8.8.4.4",
+						},
+					},
 				},
 			},
 		},
@@ -98,8 +101,7 @@ func LaunchSecondVM(tapName1 string, tapName2 string) {
 	entry := logrus.NewEntry(logger)
 
 	ctx := context.Background()
-
-	m2, err := firecracker.NewMachine(ctx, cfg2, firecracker.WithLogger(entry))
+	m1, err := firecracker.NewMachine(ctx, cfg1, firecracker.WithLogger(entry))
 	if err != nil {
 		fmt.Printf("Failed to create VM2: %v\n", err)
 		return
@@ -122,11 +124,11 @@ func LaunchSecondVM(tapName1 string, tapName2 string) {
 
 	go func() {
 		defer wg.Done()
-		if err := m2.Start(vmmCtx); err != nil {
+		if err := m1.Start(vmmCtx); err != nil {
 			fmt.Printf("Failed to start VM2: %v\n", err)
 			return
 		}
-		if err := m2.Wait(vmmCtx); err != nil {
+		if err := m1.Wait(vmmCtx); err != nil {
 			fmt.Printf("VM2 exited with error: %v\n", err)
 		} else {
 			fmt.Println("VM2 exited successfully")

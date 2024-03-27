@@ -16,7 +16,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func LaunchFirstVM(tapName1 string, tapName2 string) {
+func LaunchFirstVM(tapName1 string) {
 	fmt.Println("Launching first VM")
 	bridge_ip_address, bridge_gateway_ip := networking.GetBridgeIPAddress()
 
