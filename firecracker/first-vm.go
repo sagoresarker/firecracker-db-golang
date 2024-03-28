@@ -58,7 +58,7 @@ func LaunchFirstVM(tapName1 string) {
 		LogFifo:         "/tmp/firecracker1.log",
 		MetricsFifo:     "/tmp/firecracker1-metrics",
 		LogLevel:        "Debug",
-		KernelImagePath: "files/nodejs/vmlinux",
+		KernelImagePath: "files/vmlinux",
 		KernelArgs:      "ro console=ttyS0 reboot=k panic=1 pci=off",
 
 		MachineCfg: models.MachineConfiguration{
@@ -71,7 +71,7 @@ func LaunchFirstVM(tapName1 string) {
 				DriveID:      firecracker.String("1"),
 				IsRootDevice: firecracker.Bool(true),
 				IsReadOnly:   firecracker.Bool(false),
-				PathOnHost:   firecracker.String("files/nodejs/nodejs-runtime.ext4"),
+				PathOnHost:   firecracker.String("files/build/rootfs.ext4"),
 			},
 		},
 		NetworkInterfaces: []firecracker.NetworkInterface{
