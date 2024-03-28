@@ -102,11 +102,17 @@ func createBridge(bridgeName string, ipAddress string) error {
 		return fmt.Errorf("failed to setup the NAT Rule to the bridge: %v", err)
 	}
 
-	// // Add a routing rule to forward traffic from the VM subnet to the host's default gateway
-	// cmd = exec.Command("sudo", "ip", "route", "add", "10.0.0.0/24", "via", "192.168.202.89", "dev", bridgeName)
-	// if err := cmd.Run(); err != nil {
-	// 	return fmt.Errorf("failed to add routing rule for VM subnet: %v", err)
-	// }
+	// Enable IP forwarding
+	cmd = exec.Command("sudo", "sysctl", "-w", "net.ipv4.ip_forward=1")
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to enable IP forwarding: %v", err)
+	}
+
+	// Add a NAT rule for the host's network interface
+	cmd = exec.Command("sudo", "iptables", "--table", "nat", "--append", "POSTROUTING", "--out-interface", "enp3s0", "-j", "MASQUERADE")
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to add NAT rule for host's network interface: %v", err)
+	}
 
 	return nil
 }
