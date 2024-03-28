@@ -22,8 +22,8 @@ func main() {
 
 	// fmt.Println("Bridge Details:", bridgeDetails)
 
-	tapName1, _ := networking.GetTapNames()
+	tapName1, tapName2 := networking.GetTapNames()
 
-	vm.LaunchFirstVM(tapName1)
+	vm.LaunchVMs(tapName1, tapName2)
 	// vm.LaunchSecondVM(tapName2)
 }

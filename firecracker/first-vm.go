@@ -16,51 +16,54 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func LaunchFirstVM(tapName1 string) {
-	fmt.Println("Launching first VM")
+func LaunchVMs(tapName1, tapName2 string) {
 	bridge_ip_address, bridge_gateway_ip := networking.GetBridgeIPAddress()
-
 	bridge_ip_without_mask, _, err := net.ParseCIDR(bridge_ip_address)
 	if err != nil {
 		fmt.Println("Error parsing bridge IP address:", err)
 		return
 	}
 
-	fmt.Println("(Launch VM) - Bridge IP without mask:", bridge_ip_without_mask)
-
-	vm1_eth0_ip, _, err := networking.GetVMIPs(bridge_ip_without_mask.String())
-
+	vm1_eth0_ip, vm2_eth0_ip, err := networking.GetVMIPs(bridge_ip_without_mask.String())
 	if err != nil {
-		fmt.Println("Error getting VM IPs:", err)
+		fmt.Println("Error getting VM1 IP:", err)
 		return
 	}
 
-	fmt.Printf("VM1 IP: %s\n", vm1_eth0_ip)
+	var wg sync.WaitGroup
+	wg.Add(2)
 
-	vm1_eth0_ip_ipv4 := net.ParseIP(vm1_eth0_ip)
-	if vm1_eth0_ip_ipv4 == nil {
-		fmt.Println("Error parsing VM1 IP address")
+	go launchVM(&wg, tapName1, vm1_eth0_ip, bridge_ip_without_mask.String(), bridge_gateway_ip, "/tmp/firecracker1.sock")
+	go launchVM(&wg, tapName2, vm2_eth0_ip, bridge_ip_without_mask.String(), bridge_gateway_ip, "/tmp/firecracker2.sock")
+
+	wg.Wait()
+}
+
+func launchVM(wg *sync.WaitGroup, tapName, vmIP, bridgeIP, bridgeGatewayIP, socketPath string) {
+	defer wg.Done()
+
+	fmt.Println("Launching VM with tap:", tapName)
+
+	vm_eth0_ip_ipv4 := net.ParseIP(vmIP)
+	if vm_eth0_ip_ipv4 == nil {
+		fmt.Println("Error parsing VM IP address")
 		return
 	}
 
-	bridge_gateway_ip_ipv4 := net.ParseIP(bridge_gateway_ip)
+	bridge_gateway_ip_ipv4 := net.ParseIP(bridgeGatewayIP)
 	fmt.Printf("Bridge Gateway IP: %s and Type %s\n", bridge_gateway_ip_ipv4, reflect.TypeOf(bridge_gateway_ip_ipv4).String())
-
 	if bridge_gateway_ip_ipv4 == nil {
 		fmt.Println("Error parsing bridge gateway IP address")
 		return
 	}
 
-	fmt.Println("tapName1 in LaunchFirstVM:", tapName1)
-
-	cfg1 := firecracker.Config{
-		SocketPath:      "/tmp/firecracker1.sock",
-		LogFifo:         "/tmp/firecracker1.log",
-		MetricsFifo:     "/tmp/firecracker1-metrics",
+	cfg := firecracker.Config{
+		SocketPath:      socketPath,
+		LogFifo:         socketPath + ".log",
+		MetricsFifo:     socketPath + "-metrics",
 		LogLevel:        "Debug",
 		KernelImagePath: "files/vmlinux",
 		KernelArgs:      "ro console=ttyS0 reboot=k panic=1 pci=off",
-
 		MachineCfg: models.MachineConfiguration{
 			VcpuCount:  firecracker.Int64(2),
 			MemSizeMib: firecracker.Int64(256),
@@ -78,18 +81,15 @@ func LaunchFirstVM(tapName1 string) {
 			{
 				StaticConfiguration: &firecracker.StaticNetworkConfiguration{
 					MacAddress:  "10:5b:ad:53:5c:17",
-					HostDevName: tapName1,
+					HostDevName: tapName,
 					IPConfiguration: &firecracker.IPConfiguration{
 						IPAddr: net.IPNet{
-							IP:   vm1_eth0_ip_ipv4,
+							IP:   vm_eth0_ip_ipv4,
 							Mask: net.CIDRMask(24, 32),
 						},
-						Gateway: bridge_ip_without_mask,
-						IfName:  "eth0",
-						Nameservers: []string{
-							"8.8.8.8",
-							"8.8.4.4",
-						},
+						Gateway:     net.ParseIP(bridgeIP),
+						IfName:      "eth0",
+						Nameservers: []string{"8.8.8.8", "8.8.4.4"},
 					},
 				},
 			},
@@ -99,11 +99,11 @@ func LaunchFirstVM(tapName1 string) {
 	logger := logrus.New()
 	logger.SetLevel(logrus.DebugLevel)
 	entry := logrus.NewEntry(logger)
-
 	ctx := context.Background()
-	m1, err := firecracker.NewMachine(ctx, cfg1, firecracker.WithLogger(entry))
+
+	m, err := firecracker.NewMachine(ctx, cfg, firecracker.WithLogger(entry))
 	if err != nil {
-		fmt.Printf("Failed to create VM1: %v\n", err)
+		fmt.Printf("Failed to create VM: %v\n", err)
 		return
 	}
 
@@ -112,28 +112,20 @@ func LaunchFirstVM(tapName1 string) {
 
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
-
 	go func() {
 		sig := <-sigCh
 		fmt.Printf("Received signal: %s\n", sig)
 		vmmCancel()
 	}()
 
-	var wg sync.WaitGroup
-	wg.Add(1)
+	if err := m.Start(vmmCtx); err != nil {
+		fmt.Printf("Failed to start VM: %v\n", err)
+		return
+	}
 
-	go func() {
-		defer wg.Done()
-		if err := m1.Start(vmmCtx); err != nil {
-			fmt.Printf("Failed to start VM1: %v\n", err)
-			return
-		}
-		if err := m1.Wait(vmmCtx); err != nil {
-			fmt.Printf("VM1 exited with error: %v\n", err)
-		} else {
-			fmt.Println("VM1 exited successfully")
-		}
-	}()
-
-	wg.Wait()
+	if err := m.Wait(vmmCtx); err != nil {
+		fmt.Printf("VM exited with error: %v\n", err)
+	} else {
+		fmt.Println("VM exited successfully")
+	}
 }
