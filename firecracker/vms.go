@@ -30,16 +30,18 @@ func LaunchVMs(tapName1, tapName2 string) {
 		return
 	}
 
+	mac_address1, mac_address2 := networking.GetMACAddress()
+
 	var wg sync.WaitGroup
 	wg.Add(2)
 
-	go launchVM(&wg, tapName1, vm1_eth0_ip, bridge_ip_without_mask.String(), bridge_gateway_ip, "/tmp/firecracker1.sock")
-	go launchVM(&wg, tapName2, vm2_eth0_ip, bridge_ip_without_mask.String(), bridge_gateway_ip, "/tmp/firecracker2.sock")
+	go launchVM(&wg, tapName1, vm1_eth0_ip, mac_address1, bridge_ip_without_mask.String(), bridge_gateway_ip, "/tmp/firecracker1.sock")
+	go launchVM(&wg, tapName2, vm2_eth0_ip, mac_address2, bridge_ip_without_mask.String(), bridge_gateway_ip, "/tmp/firecracker2.sock")
 
 	wg.Wait()
 }
 
-func launchVM(wg *sync.WaitGroup, tapName, vmIP, bridgeIP, bridgeGatewayIP, socketPath string) {
+func launchVM(wg *sync.WaitGroup, tapName, vmIP, mac_address, bridgeIP, bridgeGatewayIP, socketPath string) {
 	defer wg.Done()
 
 	fmt.Println("Launching VM with tap:", tapName)
@@ -66,7 +68,7 @@ func launchVM(wg *sync.WaitGroup, tapName, vmIP, bridgeIP, bridgeGatewayIP, sock
 		KernelArgs:      "ro console=ttyS0 reboot=k panic=1 pci=off",
 		MachineCfg: models.MachineConfiguration{
 			VcpuCount:  firecracker.Int64(2),
-			MemSizeMib: firecracker.Int64(256),
+			MemSizeMib: firecracker.Int64(512),
 			Smt:        firecracker.Bool(false),
 		},
 		Drives: []models.Drive{
@@ -80,7 +82,7 @@ func launchVM(wg *sync.WaitGroup, tapName, vmIP, bridgeIP, bridgeGatewayIP, sock
 		NetworkInterfaces: []firecracker.NetworkInterface{
 			{
 				StaticConfiguration: &firecracker.StaticNetworkConfiguration{
-					MacAddress:  "10:5b:ad:53:5c:17",
+					MacAddress:  mac_address,
 					HostDevName: tapName,
 					IPConfiguration: &firecracker.IPConfiguration{
 						IPAddr: net.IPNet{
